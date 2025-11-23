@@ -9,6 +9,5 @@ public class OtpSubmitRequestDto {
 
     private String userName;
     private String otp;
-    private LocalDate currentTime;
 
 }

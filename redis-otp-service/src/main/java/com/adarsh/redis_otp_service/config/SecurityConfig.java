@@ -34,9 +34,12 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http.
                 csrf(csrf -> csrf.disable())
+                .headers(headers -> headers.frameOptions(frame -> frame.disable()))
                 .authorizeHttpRequests(auth ->
                     auth.requestMatchers("/api/auth/login").permitAll()
                             .requestMatchers("/api/auth/signUp").permitAll()
+                            .requestMatchers("/api/auth/validateOtp").permitAll()
+                            .requestMatchers("/h2-console/**").permitAll()
                             .anyRequest().authenticated()
                 )
                 .userDetailsService(userDetailsService)

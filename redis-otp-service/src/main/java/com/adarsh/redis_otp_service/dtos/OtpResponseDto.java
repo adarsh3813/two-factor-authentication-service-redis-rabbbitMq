@@ -3,14 +3,16 @@ package com.adarsh.redis_otp_service.dtos;
 import lombok.Builder;
 import lombok.Data;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
 public class OtpResponseDto {
 
     private String userName;
-    private String oneTimePassword;
-    private LocalDate expiryTime;
+    private String message;
+    private LocalDateTime currentTime;
+    private Integer expiresIn;
+    private String otp;
 
 }

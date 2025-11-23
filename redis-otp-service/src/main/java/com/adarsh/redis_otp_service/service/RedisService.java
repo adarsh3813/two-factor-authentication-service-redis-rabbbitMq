@@ -5,39 +5,36 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class RedisService {
 
-    private final RedisTemplate<String, String> redisTemplate;
-    private final ObjectMapper objectMapper;
+    private final StringRedisTemplate redisTemplate;
 
-    public void set(String key, Object valueObj) {
-
-        try {
-            String value = objectMapper.writeValueAsString(valueObj);
-            redisTemplate.opsForValue().set(key, value);
-        } catch (JsonProcessingException e) {
-            log.info("Error parsing valueObj to String: {}", e.getMessage());
-            throw new RuntimeException("Failed to serialize object", e);
-        }
-
+    public void set(String key, String value, Integer ttl) {
+        redisTemplate.opsForValue().set(key, value, ttl, TimeUnit.MINUTES);
     }
 
-    public <T> T get(String key, Class<T> targetClass) {
+    public String get(String key) {
         try {
             String value = redisTemplate.opsForValue().get(key);
             if(Objects.isNull(value)) return null;
-            return objectMapper.readValue(value, targetClass);
+            return value;
         } catch (Exception e) {
-            log.error("Failed while parsing to {} class type: {}", targetClass, e.getMessage());
+            log.error("Failed while parsing to {}", e.getMessage());
             throw new RuntimeException(e.getMessage());
         }
+    }
+
+    public void delete(String key) {
+        redisTemplate.delete(key);
     }
 
 }

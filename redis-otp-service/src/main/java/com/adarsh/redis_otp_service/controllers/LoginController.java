@@ -9,6 +9,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -20,27 +21,28 @@ public class LoginController {
     @PostMapping
     public ResponseEntity<Object> login(@RequestBody LoginRequestDto dto) {
 
-        LoginResultResponse loginResultResponse = loginService.handleUserLogin(dto);
-        return ResponseEntity.ok().body(loginResultResponse);
+        OtpResponseDto otpResponseDto = loginService.handleUserLogin(dto);
+        return ResponseEntity.ok().body(otpResponseDto);
     }
 
     @PostMapping("/validateOtp")
-    public ResponseEntity<Object> validateOtp(@RequestBody OtpSubmitRequestDto dto, Authentication authentication) {
+    public ResponseEntity<Object> validateOtp(@RequestBody OtpSubmitRequestDto dto) {
 
-        if(dto.getUserName().equals(authentication.getName())) {
+        try {
             LoginResultResponse response = loginService.validateOtp(dto);
             return ResponseEntity.ok().body(response);
+        } catch (Exception e) {
+            return new ResponseEntity<>(ErrorResponse.builder().
+                    timeStamp(LocalDateTime.now()).
+                    message("Invalid Otp")
+                    .build(), HttpStatus.BAD_REQUEST);
         }
-        return new ResponseEntity<>(ErrorResponse.builder().
-                timeStamp(LocalDate.now()).
-                message("Invalid user")
-                .build(), HttpStatus.FORBIDDEN);
     }
 
     @PostMapping("/signUp")
     public ResponseEntity<Object> signUpUser(@RequestBody SignUpRequestDto dto) {
-        LoginResultResponse loginResultResponse = loginService.signUpUser(dto);
-        return ResponseEntity.ok().body(loginResultResponse);
+        OtpResponseDto otpResponseDto = loginService.signUpUser(dto);
+        return ResponseEntity.ok().body(otpResponseDto);
     }
 
 }

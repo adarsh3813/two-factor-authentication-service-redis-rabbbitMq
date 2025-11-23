@@ -5,7 +5,6 @@ import com.adarsh.redis_otp_service.model.Roles;
 import com.adarsh.redis_otp_service.model.User;
 import com.adarsh.redis_otp_service.repository.UserRepository;
 import com.adarsh.redis_otp_service.security.JwtUtil;
-import com.adarsh.redis_otp_service.security.UserDetailsImpl;
 import com.adarsh.redis_otp_service.security.UserDetailsServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -14,73 +13,61 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
 public class LoginService {
 
-    private final RedisService redisService;
     private static final Integer OTP_LENGTH = 4;
+    private static final Integer OTP_TIMEOUT = 2;
+
+    private final UserService userService;
+    private final RedisService redisService;
     private final UserRepository userRepository;
     private final UserDetailsServiceImpl userDetailsService;
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
 
-    public LoginResultResponse signUpUser(SignUpRequestDto dto) {
+    public OtpResponseDto signUpUser(SignUpRequestDto dto) {
         if(userRepository.findByUserName(dto.getUserName()).isPresent()) {
             throw new RuntimeException("Username already exists");
         }
 
-        User user = new User();
-        user.setUserName(dto.getUserName());
-        user.setEmail(dto.getEmail());
-        user.setRole(Roles.CUSTOMER);
-        user.setPassword(dto.getPassword());
-        user.setFullName(dto.getFullName());
+        userService.saveNewUser(dto);
 
-        User savedUser = userRepository.save(user);
-        UserDetails userDetails = userDetailsService.loadUserByUsername(savedUser.getUserName());
-        String token = jwtUtil.generateToken(userDetails);
+        String otp = generateOtp();
+        redisService.set("otp:"+dto.getUserName(), otp, OTP_TIMEOUT);
 
-        return LoginResultResponse.builder()
+        return OtpResponseDto.builder()
                 .userName(dto.getUserName())
-                .message("User verified please proceed to verify using OTP sent to your email ID")
-                .token(token)
+                .message("Account created! OTP has been sent to the linked emailId")
+                .currentTime(LocalDateTime.now())
+                .expiresIn(OTP_TIMEOUT)
+                .otp(otp)
                 .build();
     }
 
-    public LoginResultResponse handleUserLogin(LoginRequestDto dto) {
+    public OtpResponseDto handleUserLogin(LoginRequestDto dto) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(dto.getUserName(), dto.getPassword())
         );
 
-        UserDetails userDetails = userDetailsService.loadUserByUsername(dto.getUserName());
-        String token = jwtUtil.generateToken(userDetails);
-
-        return LoginResultResponse.builder()
-                .userName(dto.getUserName())
-                .message("User verified please proceed to verify using OTP sent to your email ID")
-                .token(token)
-                .build();
-    }
-
-    public OtpResponseDto generateOtp(LoginRequestDto dto) {
-
         String otp = generateOtp();
-        redisService.set(dto.getUserName(), otp);
+        redisService.set("otp:"+dto.getUserName(), otp, OTP_TIMEOUT);
 
-        return OtpResponseDto.builder().
-                userName(dto.getUserName())
-                .oneTimePassword(otp)
-                .expiryTime(LocalDate.now().plus(30, ChronoUnit.SECONDS))
+        return OtpResponseDto.builder()
+                .userName(dto.getUserName())
+                .message("OTP has been sent to the linked emailId")
+                .currentTime(LocalDateTime.now())
+                .expiresIn(OTP_TIMEOUT)
+                .otp(otp)
                 .build();
     }
 
     public LoginResultResponse validateOtp(OtpSubmitRequestDto dto) {
-        String correctOtp = redisService.get(dto.getUserName(), String.class);
+        String correctOtp = redisService.get("otp:"+dto.getUserName());
 
         if(Objects.isNull(correctOtp)) {
             return LoginResultResponse.builder()
@@ -90,10 +77,16 @@ public class LoginService {
         }
 
         if(dto.getOtp().equals(correctOtp)) {
+
+            UserDetails userDetails = userDetailsService.loadUserByUsername(dto.getUserName());
+            String token = jwtUtil.generateToken(userDetails);
+
+            redisService.delete("otp:"+dto.getUserName());
+
             return LoginResultResponse.builder()
                     .userName(dto.getUserName())
                     .message("Login successful!")
-                    .token("RANDOM_TEMPORARY_TOKEN")
+                    .token(token)
                     .build();
         } else {
             return LoginResultResponse.builder()
@@ -113,7 +106,6 @@ public class LoginService {
         }
 
         return otp.toString();
-
     }
 
 }
