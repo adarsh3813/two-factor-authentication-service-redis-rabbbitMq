@@ -10,9 +10,10 @@ import java.time.LocalDateTime;
 public class OtpResponseDto {
 
     private String userName;
+    private String email;
     private String message;
     private LocalDateTime currentTime;
     private Integer expiresIn;
-    private String otp;
+    private boolean otpSent;
 
 }

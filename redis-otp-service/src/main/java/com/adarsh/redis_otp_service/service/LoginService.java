@@ -1,10 +1,9 @@
 package com.adarsh.redis_otp_service.service;
 
 import com.adarsh.redis_otp_service.dtos.*;
-import com.adarsh.redis_otp_service.model.Roles;
-import com.adarsh.redis_otp_service.model.User;
 import com.adarsh.redis_otp_service.repository.UserRepository;
 import com.adarsh.redis_otp_service.security.JwtUtil;
+import com.adarsh.redis_otp_service.security.UserDetailsImpl;
 import com.adarsh.redis_otp_service.security.UserDetailsServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -29,6 +28,7 @@ public class LoginService {
     private final UserDetailsServiceImpl userDetailsService;
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
+    private final OtpService otpService;
 
     public OtpResponseDto signUpUser(SignUpRequestDto dto) {
         if(userRepository.findByUserName(dto.getUserName()).isPresent()) {
@@ -36,16 +36,17 @@ public class LoginService {
         }
 
         userService.saveNewUser(dto);
-
+        UserDetailsImpl userDetails = userDetailsService.loadUserByUsername(dto.getUserName());
         String otp = generateOtp();
         redisService.set("otp:"+dto.getUserName(), otp, OTP_TIMEOUT);
+        boolean otpSent = otpService.sendOtp(otp, userDetails.getEmail(), dto.getUserName());
 
         return OtpResponseDto.builder()
                 .userName(dto.getUserName())
                 .message("Account created! OTP has been sent to the linked emailId")
                 .currentTime(LocalDateTime.now())
                 .expiresIn(OTP_TIMEOUT)
-                .otp(otp)
+                .otpSent(otpSent)
                 .build();
     }
 
@@ -54,15 +55,20 @@ public class LoginService {
                 new UsernamePasswordAuthenticationToken(dto.getUserName(), dto.getPassword())
         );
 
+        UserDetailsImpl userDetails = userDetailsService.loadUserByUsername(dto.getUserName());
+
         String otp = generateOtp();
         redisService.set("otp:"+dto.getUserName(), otp, OTP_TIMEOUT);
+
+        boolean otpSent = otpService.sendOtp(otp, userDetails.getEmail(), dto.getUserName());
 
         return OtpResponseDto.builder()
                 .userName(dto.getUserName())
                 .message("OTP has been sent to the linked emailId")
                 .currentTime(LocalDateTime.now())
                 .expiresIn(OTP_TIMEOUT)
-                .otp(otp)
+                .email(userDetails.getEmail())
+                .otpSent(otpSent)
                 .build();
     }
 
