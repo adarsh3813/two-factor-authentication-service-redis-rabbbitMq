@@ -17,7 +17,8 @@ public class MailService {
 
     private final JavaMailSender javaMailSender;
 
-    public void sendEmail(String to, String subject, String otp) {
+
+    public void sendEmail(String to, String subject, String username, String otp) {
 
         try {
             MimeMessage message = javaMailSender.createMimeMessage();
